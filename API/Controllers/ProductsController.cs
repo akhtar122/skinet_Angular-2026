@@ -2,53 +2,60 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using API.Controllers;
+using API.RequestHelpers;
 using Core.Entities;
 using Core.Interfaces;
+using Core.Specifications;
 using Microsoft.AspNetCore.Mvc;
 
-[ApiController]
-[Route("api/[controller]")]
-public class ProductsController : ControllerBase
+public class ProductsController : BaseApiController
 {
     private readonly ILogger<ProductsController> _logger;
-    private readonly IProductRepository _repo;
+    //private readonly IProductRepository _repo;
+    private readonly IGenericRepository<Product> repo;
 
-    public ProductsController(ILogger<ProductsController> logger, IProductRepository repo)
+    public ProductsController(ILogger<ProductsController> logger, IGenericRepository<Product> _repo)
     {
         _logger = logger;
-        _repo = repo;
+        repo = _repo;
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Product>>> GetProducts([FromQuery] string? brand, [FromQuery] string? type, [FromQuery] string? sort)
+    public async Task<ActionResult<IEnumerable<Product>>> GetProducts([FromQuery] string? brand, [FromQuery] ProductSpecParams specParams)
     {
-        var products = await _repo.GetProductsAsync(brand, type, sort);
-        return Ok(products);
+        //var products = await _repo.GetProductsAsync(brand, type, sort);
+        var spec = new ProductSpecification(specParams);
+        //var product =  await repo.ListAsync(spec);
+        //var count = await repo.CountAsync(spec);
+        //var pagination = new Pagination<Product>(specParams.PageIndex, specParams.PageSize, count, product);
+
+        return await CretePageResult(repo, spec, specParams.PageIndex, specParams.PageSize);
     }
 
     [HttpGet("{id}")]
     public async Task<ActionResult<Product>> GetProduct(int id)
     {
-        var product = await _repo.GetProductByIdAsync(id);
+        var product = await repo.GetByIdAsync(id);
         if (product == null) return NotFound();
         return Ok(product);
     }
 
-    [HttpGet("byname/{name}")]
-    public async Task<ActionResult<Product>> GetProductByName(string name)
-    {
-        // Interface doesn't expose GetByName; use GetProductsAsync to look up by name.
-        var products = await _repo.GetProductsAsync(null, null, null);
-        var product = products.FirstOrDefault(p => p.Name == name);
-        if (product == null) return NotFound();
-        return Ok(product);
-    }
+    //[HttpGet("byname/{name}")]
+    //public async Task<ActionResult<Product>> GetProductByName(string name)
+    //{
+    //    // Interface doesn't expose GetByName; use GetProductsAsync to look up by name.
+    //    var products = await repo.;
+    //    var product = products.FirstOrDefault(p => p.Name == name);
+    //    if (product == null) return NotFound();
+    //    return Ok(product);
+    //}
 
     [HttpPost]
     public async Task<ActionResult<Product>> CreateProduct([FromBody] Product product)
     {
-        _repo.AddProduct(product);
-        if (await _repo.SaveChangesAsync())
+        repo.Add(product);
+        if (await repo.SaveAllAsync())
         {
             return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
         }
@@ -61,23 +68,39 @@ public class ProductsController : ControllerBase
     {
         if (id != product.Id) return BadRequest();
 
-        if (!_repo.ProductExists(id)) return NotFound();
+        if (!repo.Exists(id)) return NotFound();
 
-        _repo.UpdateProduct(product);
-        if (await _repo.SaveChangesAsync())
+        repo.Update(product);
+        if (await repo.SaveAllAsync())
             return NoContent();
 
         return BadRequest("Could not update product.");
     }
 
+    [HttpGet("brands")]
+    public async Task<ActionResult<IEnumerable<string>>> GetBrands()
+    {
+        var spec = new BrandListSpecification();
+        //var products = await repo.ListAllAsync();
+        //var brands = products.Select(p => p.Brand).Distinct().ToList();
+        return Ok(await repo.ListAsync(spec));
+    }
+
+    [HttpGet("types")]
+    public async Task<ActionResult<IEnumerable<string>>> GetTypes()
+    {
+        var spec = new TypeListSpecification();       
+        return Ok(await repo.ListAsync(spec));
+    }
+
     [HttpDelete("{id}")]
     public async Task<ActionResult> DeleteProduct(int id)
     {
-        var product = await _repo.GetProductByIdAsync(id);
+        var product = await repo.GetByIdAsync(id);
         if (product == null) return NotFound();
 
-        _repo.DeleteProduct(product);
-        if (await _repo.SaveChangesAsync())
+        repo.Remove(product);
+        if (await repo.SaveAllAsync())
             return NoContent();
 
         return BadRequest("Could not delete product.");
