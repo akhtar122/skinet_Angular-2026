@@ -13,12 +13,12 @@ public class ProductsController : BaseApiController
 {
     private readonly ILogger<ProductsController> _logger;
     //private readonly IProductRepository _repo;
-    private readonly IGenericRepository<Product> repo;
+    private readonly IGenericRepository<Product> _repo;
 
-    public ProductsController(ILogger<ProductsController> logger, IGenericRepository<Product> _repo)
+    public ProductsController(ILogger<ProductsController> logger, IGenericRepository<Product> repo)
     {
         _logger = logger;
-        repo = _repo;
+        _repo = repo;
     }
 
     [HttpGet]
@@ -30,13 +30,13 @@ public class ProductsController : BaseApiController
         //var count = await repo.CountAsync(spec);
         //var pagination = new Pagination<Product>(specParams.PageIndex, specParams.PageSize, count, product);
 
-        return await CretePageResult(repo, spec, specParams.PageIndex, specParams.PageSize);
+        return await CretePageResult(_repo, spec, specParams.PageIndex, specParams.PageSize);
     }
 
     [HttpGet("{id}")]
     public async Task<ActionResult<Product>> GetProduct(int id)
     {
-        var product = await repo.GetByIdAsync(id);
+        var product = await _repo.GetByIdAsync(id);
         if (product == null) return NotFound();
         return Ok(product);
     }
@@ -54,8 +54,8 @@ public class ProductsController : BaseApiController
     [HttpPost]
     public async Task<ActionResult<Product>> CreateProduct([FromBody] Product product)
     {
-        repo.Add(product);
-        if (await repo.SaveAllAsync())
+        _repo.Add(product);
+        if (await _repo.SaveAllAsync())
         {
             return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
         }
@@ -68,10 +68,10 @@ public class ProductsController : BaseApiController
     {
         if (id != product.Id) return BadRequest();
 
-        if (!repo.Exists(id)) return NotFound();
+        if (!_repo.Exists(id)) return NotFound();
 
-        repo.Update(product);
-        if (await repo.SaveAllAsync())
+        _repo.Update(product);
+        if (await _repo.SaveAllAsync())
             return NoContent();
 
         return BadRequest("Could not update product.");
@@ -83,24 +83,24 @@ public class ProductsController : BaseApiController
         var spec = new BrandListSpecification();
         //var products = await repo.ListAllAsync();
         //var brands = products.Select(p => p.Brand).Distinct().ToList();
-        return Ok(await repo.ListAsync(spec));
+        return Ok(await _repo.ListAsync(spec));
     }
 
     [HttpGet("types")]
     public async Task<ActionResult<IEnumerable<string>>> GetTypes()
     {
         var spec = new TypeListSpecification();       
-        return Ok(await repo.ListAsync(spec));
+        return Ok(await _repo.ListAsync(spec));
     }
 
     [HttpDelete("{id}")]
     public async Task<ActionResult> DeleteProduct(int id)
     {
-        var product = await repo.GetByIdAsync(id);
+        var product = await _repo.GetByIdAsync(id);
         if (product == null) return NotFound();
 
-        repo.Remove(product);
-        if (await repo.SaveAllAsync())
+        _repo.Remove(product);
+        if (await _repo.SaveAllAsync())
             return NoContent();
 
         return BadRequest("Could not delete product.");
